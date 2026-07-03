@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon Tamagotchi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --device: #7B904B;
+    --device-dark: #62753A;
+    --ink: #000000;
+    --screen-bg: #F6F6E9;
+    --btn-face: #9CB169;
+    --hunger: #E8735C;
+    --happy: #F2C14E;
+    --clean: #5FA8D3;
+    --bar-empty: #E4E4D6;
+    --danger: #D9483B;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: radial-gradient(circle at 50% 20%, #EDEADB 0%, #DCD8C4 100%);
+    font-family: 'Pixelify Sans', monospace;
+    color:#000;
+    padding:24px;
+  }
+
+  .wrap{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+
+  .title{ font-size:20px; letter-spacing:2px; text-align:center; }
+
+  .device{
+    background: var(--device);
+    border: 4px solid var(--ink);
+    border-radius: 28px;
+    padding: 22px;
+    display:flex;
+    gap:18px;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.2), inset 0 0 0 3px var(--device-dark);
+  }
+
+  .screen-frame{ background:#000; border-radius:10px; padding:8px; }
+
+  .screen{
+    width: 280px;
+    height: 280px;
+    background: var(--screen-bg);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .screen-state{
+    position:absolute;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:14px;
+    text-align:center;
+  }
+  .screen-state.active{ display:flex; }
+
+  /* ---------- Buttons ---------- */
+  .buttons{ display:flex; flex-direction:column; justify-content:center; gap:16px; }
+  .btn{
+    width:52px; height:52px;
+    border-radius:50%;
+    background: var(--btn-face);
+    border: 3px solid var(--ink);
+    box-shadow: 0 4px 0 #000;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:700;
+    cursor:pointer; user-select:none;
+    transition: transform 0.05s;
+  }
+  .btn:active{ transform: translateY(4px); box-shadow: 0 0 0 #000; }
+  .btn-label{ display:block; font-size:9px; text-align:center; margin-top:4px; letter-spacing:1px; }
+
+  /* ---------- Shared egg art ---------- */
+  .egg-img{ width:78px; height:94px; image-rendering:pixelated; object-fit:contain; }
+  .emoji-fallback{ font-size:60px; line-height:1; }
+
+  /* ---------- Start screen ---------- */
+  .blink{ animation: blink 1s steps(1) infinite; }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  /* ---------- Egg screen ---------- */
+  .egg-progress-track{
+    width:180px; height:12px;
+    border:2px solid var(--ink);
+    background: var(--bar-empty);
+    margin-top:18px;
+    position:relative;
+  }
+  .egg-progress-fill{ height:100%; width:0%; background: var(--device); }
+
+  /* ---------- Name screen ---------- */
+  .name-input{
+    font-family:'Pixelify Sans', monospace;
+    font-size:16px; text-align:center;
+    padding:6px 8px;
+    border:3px solid var(--ink);
+    border-radius:3px;
+    width:160px; margin-top:10px;
+    background:#fff;
+  }
+  .name-input:focus{ outline:2px solid var(--device-dark); }
+
+  /* ---------- Care screen ---------- */
+  .care-top{
+    padding:10px 12px 6px 12px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .stat-row{ display:flex; align-items:center; gap:8px; }
+  .stat-ico{
+    width:24px; height:24px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .stat-ico img{ width:22px; height:22px; image-rendering:pixelated; object-fit:contain; }
+  .stat-ico .emoji-fallback{ font-size:16px; }
+  .stat-bar{
+    flex:1;
+    display:flex; gap:2px;
+    height:20px;
+    border:2px solid var(--ink);
+    background: var(--bar-empty);
+    padding:2px;
+  }
+  .stat-seg{ flex:1; background: transparent; }
+  .stat-seg.filled.hunger{ background: var(--hunger); }
+  .stat-seg.filled.happiness{ background: var(--happy); }
+  .stat-seg.filled.cleanliness{ background: var(--clean); }
+
+  .age-display{ font-size:10px; text-align:right; padding:2px 12px 0 0; letter-spacing:1px; opacity:0.7; }
+
+  .pet-stage{ flex:1; position:relative; display:flex; align-items:center; justify-content:center; }
+
+  /* Choppy up/down tick — no smooth easing */
+  .sprite-wrap{ position:relative; animation: bobChoppy 0.8s steps(1,end) infinite; }
+  @keyframes bobChoppy{
+    0%{ transform: translateY(3px); }
+    50%{ transform: translateY(-3px); }
+    100%{ transform: translateY(3px); }
+  }
+  .sprite-wrap.warning{
+    animation: bobChoppy 0.8s steps(1,end) infinite, shakeChoppy 0.36s steps(1,end) infinite;
+  }
+  @keyframes shakeChoppy{
+    0%{ margin-left:-3px; }
+    50%{ margin-left:3px; }
+    100%{ margin-left:-3px; }
+  }
+
+  .sprite-img{ width:96px; height:96px; image-rendering:pixelated; object-fit:contain; display:none; }
+  .sprite-placeholder{
+    width:88px; height:88px;
+    border:4px solid var(--ink);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  .sprite-placeholder .eye{ position:absolute; top:30px; width:8px; height:8px; background:#000; border-radius:1px; }
+  .sprite-placeholder .eye.left{ left:24px; }
+  .sprite-placeholder .eye.right{ right:24px; }
+  .warning-flag{ position:absolute; top:-14px; right:-10px; font-size:18px; display:none; }
+  .sprite-wrap.warning .warning-flag{ display:block; }
+
+  .poop{
+    position:absolute;
+    width:26px; height:26px;
+    background-color:#7A5230;              /* fallback if image missing */
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    border-radius:20%;
+    cursor:pointer;
+    image-rendering:pixelated;
+    z-index:5;
+  }
+  .poop.has-img{ background-color:transparent; border-radius:0; }
+
+  .float-text{
+    position:absolute;
+    font-size:12px; font-weight:700;
+    pointer-events:none;
+    animation: floatUp 0.9s ease-out forwards;
+    z-index:6;
+  }
+  @keyframes floatUp{
+    0%{ opacity:1; transform: translateY(0); }
+    100%{ opacity:0; transform: translateY(-24px); }
+  }
+
+  .action-row{
+    display:flex; justify-content:space-around;
+    border-top:2px solid var(--ink);
+    padding:8px 6px;
+    background: rgba(0,0,0,0.03);
+  }
+  .action-item{
+    font-size:9px; text-align:center;
+    padding:4px 8px;
+    border:2px solid transparent;
+    letter-spacing:0.5px;
+  }
+  .action-item .action-icon{
+    width:28px; height:28px;
+    image-rendering:pixelated; object-fit:contain;
+    display:block; margin:0 auto 3px auto;
+  }
+  .action-item .emoji-fallback{ font-size:18px; display:block; margin-bottom:3px; }
+  .action-item.selected{
+    border-color: var(--ink);
+    background: var(--btn-face);
+    border-radius:4px;
+  }
+
+  /* ---------- Game over ---------- */
+  .epitaph{ font-size:13px; line-height:1.6; }
+  .epitaph .name{ font-weight:700; }
+  .hint{ font-size:9px; margin-top:16px; opacity:0.75; letter-spacing:1px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="title">POCKET CARE</div>
+
+  <div class="device">
+    <div class="screen-frame">
+      <div class="screen" id="screen">
+
+        <!-- START -->
+        <div class="screen-state active" id="state-start">
+          <div style="font-size:13px; margin-bottom:14px;">A wild egg awaits...</div>
+          <img class="egg-img" src="egg.png" alt="egg" onerror="iconError(this,'🥚')">
+          <div class="blink" style="font-size:11px; margin-top:18px;">PRESS A TO START</div>
+        </div>
+
+        <!-- EGG -->
+        <div class="screen-state" id="state-egg">
+          <img class="egg-img" id="egg-anim" src="egg-animated.png" alt="egg" onerror="iconError(this,'🥚')">
+          <div style="font-size:10px; margin-top:16px; letter-spacing:1px;">INCUBATING...</div>
+          <div class="egg-progress-track"><div class="egg-progress-fill" id="egg-progress"></div></div>
+        </div>
+
+        <!-- NAME -->
+        <div class="screen-state" id="state-name">
+          <div style="font-size:11px;">It hatched into</div>
+          <div style="font-size:15px; font-weight:700; margin:4px 0 10px 0;" id="hatched-species"></div>
+          <div class="sprite-wrap" id="name-sprite-wrap"></div>
+          <input type="text" class="name-input" id="name-input" maxlength="12" placeholder="Nickname">
+          <div class="hint">PRESS A TO CONFIRM</div>
+        </div>
+
+        <!-- CARE -->
+        <div class="screen-state" id="state-care" style="padding:0; justify-content:flex-start;">
+          <div class="care-top">
+            <div class="stat-row">
+              <span class="stat-ico"><img src="beast meat.png" alt="hunger" onerror="iconError(this,'🍖')"></span>
+              <div class="stat-bar" data-stat="hunger" id="bar-hunger"></div>
+            </div>
+            <div class="stat-row">
+              <span class="stat-ico"><img src="balloon.png" alt="happy" onerror="iconError(this,'🎈')"></span>
+              <div class="stat-bar" data-stat="happiness" id="bar-happiness"></div>
+            </div>
+            <div class="stat-row">
+              <span class="stat-ico"><img src="water.png" alt="clean" onerror="iconError(this,'💧')"></span>
+              <div class="stat-bar" data-stat="cleanliness" id="bar-cleanliness"></div>
+            </div>
+          </div>
+          <div class="age-display" id="age-display">AGE 0:00</div>
+          <div class="pet-stage" id="pet-stage">
+            <div class="sprite-wrap" id="care-sprite-wrap">
+              <span class="warning-flag">❗</span>
+            </div>
+          </div>
+          <div class="action-row">
+            <div class="action-item" data-action="feed"><img class="action-icon" id="feed-icon" src="beast meat.png" alt="feed" onerror="iconError(this,'🍖')">FEED</div>
+            <div class="action-item" data-action="play"><img class="action-icon" src="balloon.png" alt="play" onerror="iconError(this,'🎈')">PLAY</div>
+            <div class="action-item" data-action="wash"><img class="action-icon" src="water.png" alt="wash" onerror="iconError(this,'💧')">WASH</div>
+          </div>
+        </div>
+
+        <!-- GAME OVER -->
+        <div class="screen-state" id="state-gameover">
+          <div class="epitaph" id="epitaph-text"></div>
+          <div class="hint">PRESS A FOR NEW EGG</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="buttons">
+      <div><div class="btn" id="btn-a">A</div><span class="btn-label">SELECT</span></div>
+      <div><div class="btn" id="btn-b">B</div><span class="btn-label">BACK</span></div>
+      <div><div class="btn" id="btn-c">C</div><span class="btn-label">CYCLE</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   ASSET FILENAMES — these match the PNGs in the same folder.
+   ========================================================= */
+const ASSETS = {
+  eggStatic: 'egg.png',
+  eggAnimated: 'egg-animated.png',
+  play: 'balloon.png',
+  wash: 'water.png',
+  poop: 'useless poo.png',
+  food: ['beast meat.png', 'hard candy.png', 'ice cream.png', 'melon.png', 'tropical juice.png']
+};
+
+/* =========================================================
+   CONFIG — tweak gameplay feel here.
+   ========================================================= */
+const CONFIG = {
+  TICK_MS: 5000,            // how often stats *might* decay
+  DECAY_CHANCE: 0.25,       // chance per stat per tick to drop by 1
+  STAT_MAX: 10,
+  START_STAT: 7,
+  ACTION_GAIN: 3,           // stat gained per Feed/Play/Wash
+  POOP_INTERVAL_MS: 10000,  // how often we roll for a new poop
+  POOP_SPAWN_CHANCE: 0.3,
+  POOP_MAX_ON_SCREEN: 3,
+  POOP_EXTRA_DECAY: 0.25,   // added to cleanliness decay per uncleaned poop
+  WARNING_THRESHOLD: 2,     // stat <= this shows the warning cue
+  GRACE_PERIOD_MS: 45000,   // time at 0 before death/runaway triggers
+  EGG_TIME_MS: 10000,       // 10 second egg incubation
+  EVOLVE_TIME_MS: 120000    // 2 minutes per stage before evolving
+};
+
+// Each stage's sprite file sits in the same folder as this HTML.
+const EVOLUTION_LINES = [
+  { stages: [
+      { name:'Hatenna',   sprite:'hatenna.png',   color:'#F4B6C2' },
+      { name:'Hattrem',   sprite:'hattrem.png',   color:'#E893A8' },
+      { name:'Hatterene', sprite:'hatterene.png', color:'#C25C7A' }
+  ]},
+  { stages: [
+      { name:'Espurr',   sprite:'espurr.png',        color:'#B39DDB' },
+      { name:'Meowstic', sprite:'meowstic-male.png', color:'#7E57C2' }
+  ]},
+  { stages: [
+      { name:'Litwick',    sprite:'litwick.png',    color:'#FFB74D' },
+      { name:'Lampent',    sprite:'lampent.png',    color:'#FF8A50' },
+      { name:'Chandelure', sprite:'chandelure.png', color:'#7B4B94' }
+  ]},
+  { stages: [
+      { name:'Solosis',   sprite:'solosis.png',   color:'#F48FB1' },
+      { name:'Duosion',   sprite:'duosion.png',   color:'#CE93D8' },
+      { name:'Reuniclus', sprite:'reuniclus.png', color:'#9575CD' }
+  ]}
+];
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+// Swap a broken <img> for an emoji so nothing shows as a broken icon.
+function iconError(img, fallback){
+  const span = document.createElement('span');
+  span.className = 'emoji-fallback';
+  span.textContent = fallback;
+  if(img.id) span.id = img.id;
+  img.replaceWith(span);
+}
+function randomFood(){ return ASSETS.food[Math.floor(Math.random()*ASSETS.food.length)]; }
+
+/* =========================================================
+   GAME STATE
+   ========================================================= */
+let game = null;
+let intervals = [];
+
+function clearAllIntervals(){ intervals.forEach(id => clearInterval(id)); intervals = []; }
+
+function newGame(){
+  clearAllIntervals();
+  document.querySelectorAll('.poop').forEach(el => el.remove());
+  game = {
+    line: EVOLUTION_LINES[Math.floor(Math.random()*EVOLUTION_LINES.length)],
+    stageIndex: 0,
+    name: '',
+    stats: { hunger: CONFIG.START_STAT, happiness: CONFIG.START_STAT, cleanliness: CONFIG.START_STAT },
+    zeroSince: { hunger:null, happiness:null, cleanliness:null },
+    selectedAction: -1,
+    startTime: null,
+    stageStartTime: null,
+    poops: 0,
+    ended: false
+  };
+}
+
+/* =========================================================
+   SCREEN HELPERS
+   ========================================================= */
+function showScreen(id){
+  document.querySelectorAll('.screen-state').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function buildSprite(container, stage){
+  container.innerHTML = '<span class="warning-flag">❗</span>';
+  const img = document.createElement('img');
+  img.className = 'sprite-img';
+  img.alt = stage.name;
+  img.src = stage.sprite;
+  const placeholder = document.createElement('div');
+  placeholder.className = 'sprite-placeholder';
+  placeholder.style.background = stage.color;
+  placeholder.innerHTML = '<div class="eye left"></div><div class="eye right"></div>';
+  img.onload = () => { img.style.display = 'block'; placeholder.style.display = 'none'; };
+  img.onerror = () => { img.style.display = 'none'; placeholder.style.display = 'flex'; };
+  container.appendChild(placeholder);
+  container.appendChild(img);
+}
+
+/* =========================================================
+   START -> EGG
+   ========================================================= */
+function goEgg(){
+  showScreen('state-egg');
+  const start = Date.now();
+  const fill = document.getElementById('egg-progress');
+  fill.style.width = '0%';
+  const eggTimer = setInterval(() => {
+    const pct = Math.min(100, ((Date.now() - start) / CONFIG.EGG_TIME_MS) * 100);
+    fill.style.width = pct + '%';
+    if(pct >= 100){
+      clearInterval(eggTimer);
+      intervals = intervals.filter(i => i !== eggTimer);
+      hatch();
+    }
+  }, 100);
+  intervals.push(eggTimer);
+}
+
+function hatch(){
+  game.stageIndex = 0;
+  const stage = game.line.stages[0];
+  document.getElementById('hatched-species').textContent = stage.name;
+  buildSprite(document.getElementById('name-sprite-wrap'), stage);
+  document.getElementById('name-input').value = '';
+  showScreen('state-name');
+  setTimeout(() => document.getElementById('name-input').focus(), 50);
+}
+
+function confirmName(){
+  const val = document.getElementById('name-input').value.trim();
+  game.name = val || game.line.stages[0].name;
+  startCare();
+}
+
+/* =========================================================
+   CARE LOOP
+   ========================================================= */
+function startCare(){
+  showScreen('state-care');
+  game.startTime = Date.now();
+  game.stageStartTime = Date.now();
+  setFeedIcon();
+  buildSprite(document.getElementById('care-sprite-wrap'), game.line.stages[game.stageIndex]);
+  renderStats();
+
+  const heartbeat = setInterval(heartbeatTick, 1000);
+  const decay = setInterval(decayTick, CONFIG.TICK_MS);
+  const poopTimer = setInterval(maybeSpawnPoop, CONFIG.POOP_INTERVAL_MS);
+  intervals.push(heartbeat, decay, poopTimer);
+}
+
+function setFeedIcon(){
+  const el = document.getElementById('feed-icon');
+  if(!el) return;
+  const src = randomFood();
+  if(el.tagName === 'IMG'){ el.src = src; }
+}
+
+function renderStats(){
+  ['hunger','happiness','cleanliness'].forEach(stat => {
+    const bar = document.getElementById('bar-' + stat);
+    bar.innerHTML = '';
+    for(let i=0;i<CONFIG.STAT_MAX;i++){
+      const seg = document.createElement('div');
+      seg.className = 'stat-seg' + (i < game.stats[stat] ? ' filled ' + stat : '');
+      bar.appendChild(seg);
+    }
+  });
+}
+
+function decayTick(){
+  if(game.ended) return;
+  const poopPenalty = game.poops > 0 ? CONFIG.POOP_EXTRA_DECAY : 0;
+  ['hunger','happiness','cleanliness'].forEach(stat => {
+    const extra = stat === 'cleanliness' ? poopPenalty : 0;
+    if(Math.random() < (CONFIG.DECAY_CHANCE + extra) && game.stats[stat] > 0){
+      game.stats[stat] -= 1;
+    }
+  });
+  renderStats();
+  updateWarningVisual();
+}
+
+function heartbeatTick(){
+  if(game.ended) return;
+
+  const elapsed = Date.now() - game.startTime;
+  document.getElementById('age-display').textContent = 'AGE ' + formatTime(elapsed);
+
+  ['hunger','happiness','cleanliness'].forEach(stat => {
+    if(game.stats[stat] <= 0){
+      if(!game.zeroSince[stat]) game.zeroSince[stat] = Date.now();
+      else if(Date.now() - game.zeroSince[stat] >= CONFIG.GRACE_PERIOD_MS){
+        if(stat === 'hunger') return endGame('starved');
+        else return endGame('ranaway');
+      }
+    } else {
+      game.zeroSince[stat] = null;
+    }
+  });
+
+  if(game.stageIndex < game.line.stages.length - 1){
+    if(Date.now() - game.stageStartTime >= CONFIG.EVOLVE_TIME_MS){
+      game.stageIndex += 1;
+      game.stageStartTime = Date.now();
+      buildSprite(document.getElementById('care-sprite-wrap'), game.line.stages[game.stageIndex]);
+      floatText(document.getElementById('pet-stage'), 'Evolved!', '50%', '10%');
+    }
+  }
+
+  updateWarningVisual();
+}
+
+function updateWarningVisual(){
+  const anyLow = Object.values(game.stats).some(v => v <= CONFIG.WARNING_THRESHOLD);
+  document.getElementById('care-sprite-wrap').classList.toggle('warning', anyLow);
+}
+
+function formatTime(ms){
+  const totalSec = Math.floor(ms/1000);
+  const m = Math.floor(totalSec/60);
+  const s = totalSec % 60;
+  return m + ':' + String(s).padStart(2,'0');
+}
+
+/* ---------- Poop ---------- */
+function maybeSpawnPoop(){
+  if(game.ended) return;
+  if(game.poops >= CONFIG.POOP_MAX_ON_SCREEN) return;
+  if(Math.random() > CONFIG.POOP_SPAWN_CHANCE) return;
+
+  const stage = document.getElementById('pet-stage');
+  const poop = document.createElement('div');
+  poop.className = 'poop';
+
+  // Use the poop PNG; probe it so we can drop the brown fallback if it loads.
+  const probe = new Image();
+  probe.onload = () => { poop.classList.add('has-img'); };
+  probe.onerror = () => {};
+  probe.src = ASSETS.poop;
+  poop.style.backgroundImage = "url('" + ASSETS.poop + "')";
+
+  const x = 10 + Math.random()*70;
+  const y = 10 + Math.random()*70;
+  poop.style.left = x + '%';
+  poop.style.top = y + '%';
+  poop.addEventListener('click', () => {
+    poop.remove();
+    game.poops = Math.max(0, game.poops - 1);
+    floatText(stage, '+clean', x + '%', y + '%');
+  });
+  stage.appendChild(poop);
+  game.poops += 1;
+}
+
+function floatText(parent, text, left, top){
+  const el = document.createElement('div');
+  el.className = 'float-text';
+  el.textContent = text;
+  el.style.left = left;
+  el.style.top = top;
+  parent.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+/* ---------- Actions ---------- */
+function performAction(type){
+  const map = { feed:'hunger', play:'happiness', wash:'cleanliness' };
+  const stat = map[type];
+  if(!stat) return;
+  game.stats[stat] = Math.min(CONFIG.STAT_MAX, game.stats[stat] + CONFIG.ACTION_GAIN);
+  if(type === 'feed'){ setFeedIcon(); }          // random food icon each feed
+  if(type === 'wash'){
+    document.querySelectorAll('.poop').forEach(el => el.remove());
+    game.poops = 0;
+  }
+  renderStats();
+  updateWarningVisual();
+  floatText(document.getElementById('pet-stage'), '+' + CONFIG.ACTION_GAIN, '50%', '40%');
+}
+
+/* ---------- Game over ---------- */
+function endGame(cause){
+  if(game.ended) return;
+  game.ended = true;
+  clearAllIntervals();
+  document.querySelectorAll('.poop').forEach(el => el.remove());
+  const age = formatTime(Date.now() - game.startTime);
+  const text = cause === 'starved'
+    ? `<span class="name">${escapeHtml(game.name)}</span> lived ${age}, loved by all.`
+    : `<span class="name">${escapeHtml(game.name)}</span> ran away after ${age}. It needed more attention.`;
+  document.getElementById('epitaph-text').innerHTML = text;
+  showScreen('state-gameover');
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+function updateActionSelection(){
+  document.querySelectorAll('.action-item').forEach((el, i) => {
+    el.classList.toggle('selected', i === game.selectedAction);
+  });
+}
+
+document.getElementById('btn-a').addEventListener('click', () => {
+  const activeId = document.querySelector('.screen-state.active').id;
+  if(activeId === 'state-start') goEgg();
+  else if(activeId === 'state-name') confirmName();
+  else if(activeId === 'state-care'){
+    const actions = ['feed','play','wash'];
+    if(game.selectedAction >= 0) performAction(actions[game.selectedAction]);
+  }
+  else if(activeId === 'state-gameover'){ newGame(); goEgg(); }
+});
+
+document.getElementById('btn-b').addEventListener('click', () => {
+  const activeId = document.querySelector('.screen-state.active').id;
+  if(activeId === 'state-care'){ game.selectedAction = -1; updateActionSelection(); }
+});
+
+document.getElementById('btn-c').addEventListener('click', () => {
+  const activeId = document.querySelector('.screen-state.active').id;
+  if(activeId === 'state-care'){
+    game.selectedAction = (game.selectedAction + 1) % 3;
+    updateActionSelection();
+  }
+});
+
+document.getElementById('name-input').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') confirmName();
+});
+
+/* =========================================================
+   INIT
+   ========================================================= */
+newGame();
+showScreen('state-start');
+</script>
+
+</body>
+</html>
